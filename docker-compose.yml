@@ -1,0 +1,41 @@
+services:
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime         # use the runtime stage from multi-stage build
+    container_name: food-tracker-backend
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"           # host:container → http://localhost:8000
+
+    environment:
+      # ── App ───────────────────────────────────────────────────────────────
+      APP_ENV: development
+#      APP_HOST: 0.0.0.0
+#      APP_PORT: 8000
+
+      # ── MongoDB Atlas ──────────────────────────────────────────────────────
+      # Paste your Atlas connection string here or keep it in .env
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME}
+
+      # ── Auth / JWT ─────────────────────────────────────────────────────────
+#      SECRET_KEY: ${SECRET_KEY}
+#      ALGORITHM: HS256
+#      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+
+      # ── Firebase Cloud Messaging ───────────────────────────────────────────
+#      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH}
+
+    volumes:
+      # Hot-reload: mount source so changes apply without rebuild
+      - ./app:/app/app
+
+      # Firebase service-account JSON (keep outside image for security)
+      - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+
+    # The backend only needs internet access (Atlas + Firebase are external)
+    # No depends_on needed — no local DB container
