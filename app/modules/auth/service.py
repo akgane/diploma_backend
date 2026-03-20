@@ -1,0 +1,52 @@
+from fastapi import HTTPException, status
+
+from http.client import HTTPException
+
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from app.core.security import hash_password, verify_password, create_access_token
+from app.modules.auth.models import build_user_document
+from app.modules.auth.schemas import RegisterRequest, UserResponse, TokenResponse, LoginRequest
+
+
+async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> UserResponse:
+    """
+    Registers new user
+    """
+
+    existing = await db["users"].find_one({"email": data.email})
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User with this email already exists",
+        )
+
+    hashed = hash_password(data.password)
+    document = build_user_document(
+        name=data.name,
+        email=data.email,
+        hashed_password=hashed,
+    )
+
+    result = await db["users"].insert_one(document)
+
+    return UserResponse(
+        id=str(result.inserted_id),
+        name=data.name,
+        email=data.email,
+    )
+
+async def login_user(data: LoginRequest, db: AsyncIOMotorDatabase) -> TokenResponse:
+    """Checks credentials and return JWT token"""
+
+    user = await db["users"].find_one({"email": data.email})
+
+    if not user or not verify_password(data.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(subject=str(user["_id"]))
+    return TokenResponse(access_token=token)
