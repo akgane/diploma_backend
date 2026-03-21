@@ -18,7 +18,11 @@ async def connect_to_mongo() -> None:
     await _database.client.admin.command('ping')
     logger.info(f"Successfully connected to MongoDB: [{settings.MONGODB_DB_NAME}]")
 
+    # creating indexes
     await _database.db["products"].create_index("barcode", sparse=True)
+    await _database.db["inventory_items"].create_index(
+        [("user_id", 1), ("expiration_date", 1)],
+    )
 
 async def close_mongo_connection() -> None:
     """Closes MongoDB connection. Called on application shutdown."""
