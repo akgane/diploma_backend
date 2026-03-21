@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import HTTPException, status
 
 from http.client import HTTPException
@@ -6,7 +8,10 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.security import hash_password, verify_password, create_access_token
 from app.modules.auth.models import build_user_document
-from app.modules.auth.schemas import RegisterRequest, UserResponse, TokenResponse, LoginRequest
+from app.modules.auth.schemas import RegisterRequest, UserResponse, TokenResponse, LoginRequest, \
+    UpdateNotificationSettingsRequest
+
+from loguru import logger
 
 
 async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> UserResponse:
@@ -36,6 +41,7 @@ async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> User
         email=data.email,
     )
 
+
 async def login_user(data: LoginRequest, db: AsyncIOMotorDatabase) -> TokenResponse:
     """Checks credentials and return JWT token"""
 
@@ -50,3 +56,26 @@ async def login_user(data: LoginRequest, db: AsyncIOMotorDatabase) -> TokenRespo
 
     token = create_access_token(subject=str(user["_id"]))
     return TokenResponse(access_token=token)
+
+
+async def update_fcm_token(token: str, user: dict, db: AsyncIOMotorDatabase) -> dict:
+    await db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {"fcm_token": token, "updated_at": datetime.now(timezone.utc)}}
+    )
+
+    logger.info(f"FCM token updated for user {user['_id']}")
+    return {"detail": "FCM token updated"}
+
+
+async def update_notification_settings(data: UpdateNotificationSettingsRequest, user: dict,
+                                       db: AsyncIOMotorDatabase) -> dict:
+    await db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {
+            "notification_days_before": data.notification_days_before,
+            "updated_at": datetime.now(timezone.utc),
+        }}
+    )
+    logger.info(f"Notification settings updated for user {user["_id"]}")
+    return {"detail": "Notification settings updated"}

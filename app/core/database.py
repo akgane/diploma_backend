@@ -12,7 +12,7 @@ _database = Database()
 
 async def connect_to_mongo() -> None:
     """Connects to MongoDB Atlas. Called on application startup."""
-    _database.client = AsyncIOMotorClient(settings.MONGODB_URL)
+    _database.client = AsyncIOMotorClient(settings.MONGODB_URL, tz_aware=True)
     _database.db = _database.client[settings.MONGODB_DB_NAME]
 
     await _database.client.admin.command('ping')
@@ -22,6 +22,9 @@ async def connect_to_mongo() -> None:
     await _database.db["products"].create_index("barcode", sparse=True)
     await _database.db["inventory_items"].create_index(
         [("user_id", 1), ("expiration_date", 1)],
+    )
+    await _database.db["inventory_items"].create_index(
+        [("status", 1), ("scheduled_notifications.send_at", 1)]
     )
 
 async def close_mongo_connection() -> None:

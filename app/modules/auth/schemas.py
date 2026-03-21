@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, EmailStr
 
+
 # region REQUESTS
 
 class RegisterRequest(BaseModel):
@@ -7,9 +8,19 @@ class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., example="john@doe.com")
     password: str = Field(..., min_length=6, max_length=100, example="strongpassword")
 
+
 class LoginRequest(BaseModel):
     email: EmailStr = Field(..., example="john@doe.com")
     password: str = Field(..., example="strongpassword")
+
+
+class UpdateFCMTokenRequest(BaseModel):
+    fcm_token: str = Field(..., example="eF3k2...")
+
+
+class UpdateNotificationSettingsRequest(BaseModel):
+    notification_days_before: list[float] = Field(..., example=[3, 1, 0.5], min_length=1)
+
 
 # endregion REQUESTS
 
@@ -18,6 +29,7 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
 
 class UserResponse(BaseModel):
     id: str

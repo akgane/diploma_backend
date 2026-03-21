@@ -1,6 +1,28 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from bson import ObjectId
+
+
+def build_scheduled_notifications(
+        expiration_date: datetime,
+        thresholds: list[float]
+) -> list[dict]:
+    """
+    Builds scheduled notifications list based on expiration date and thresholds.
+    Skips thresholds where send_at is in the past
+    """
+    now = datetime.now(timezone.utc)
+    scheduled = []
+
+    for threshold in thresholds:
+        send_at = expiration_date - timedelta(days=threshold)
+        if send_at > now:
+            scheduled.append({
+                "threshold": threshold,
+                "send_at": send_at,
+                "sent": False
+            })
+    return scheduled
 
 
 def build_inventory_document(
@@ -8,6 +30,7 @@ def build_inventory_document(
         expiration_date: datetime,
         amount: float,
         unit: str,
+        scheduled_notifications: list[dict],
         product_id: ObjectId | None = None,
         barcode: str | None = None,
         custom_name: str | None = None,
@@ -30,6 +53,7 @@ def build_inventory_document(
         "unit": unit,
         "expiration_date": expiration_date,
         "status": "active",
+        "scheduled_notifications": scheduled_notifications,
         "added_at": now,
         "updated_at": now,
     }

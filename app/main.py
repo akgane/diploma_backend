@@ -1,18 +1,29 @@
+import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.config import settings
-from app.core.database import connect_to_mongo, close_mongo_connection
+from app.core.database import connect_to_mongo, close_mongo_connection, get_db
+from app.core.firebase import init_firebase
 
 from app.modules.auth.router import router as auth_router
+from app.modules.notifications.scheduler import start_notification_scheduler
+from app.modules.notifications.service import send_expiration_notification
 from app.modules.products.router import router as product_router
 from app.modules.inventory.router import router as inventory_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_to_mongo()
+    init_firebase()
+
+    db = get_db()
+    asyncio.create_task(start_notification_scheduler(db))
+
     yield
+
     await close_mongo_connection()
 
 app = FastAPI(
@@ -30,3 +41,8 @@ app.include_router(inventory_router, prefix="/api/v1/inventory", tags=["Inventor
 @app.get("/health", tags=["System"])
 async def health_check():
     return {"status": "ok", "version": "0.1.0"}
+
+@app.post("/debug/trigger-notifications", tags=["Debug"])
+async def trigger_notifications(db: AsyncIOMotorDatabase = Depends(get_db)):
+    await send_expiration_notification(db)
+    return {"detail": "done"}

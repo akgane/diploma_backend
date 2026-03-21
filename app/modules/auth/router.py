@@ -3,10 +3,13 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from starlette import status
 
 from app.core.database import get_db
-from app.modules.auth.schemas import UserResponse, RegisterRequest, TokenResponse, LoginRequest
-from app.modules.auth.service import register_user, login_user
+from app.modules.auth.dependecies import get_current_user
+from app.modules.auth.schemas import UserResponse, RegisterRequest, TokenResponse, LoginRequest, UpdateFCMTokenRequest, \
+    UpdateNotificationSettingsRequest
+from app.modules.auth.service import register_user, login_user, update_fcm_token, update_notification_settings
 
 router = APIRouter()
+
 
 @router.post(
     "/register",
@@ -17,6 +20,7 @@ router = APIRouter()
 async def register(data: RegisterRequest, db: AsyncIOMotorDatabase = Depends(get_db)):
     return await register_user(data, db)
 
+
 @router.post(
     "/login",
     response_model=TokenResponse,
@@ -24,3 +28,22 @@ async def register(data: RegisterRequest, db: AsyncIOMotorDatabase = Depends(get
 )
 async def login(data: LoginRequest, db: AsyncIOMotorDatabase = Depends(get_db)):
     return await login_user(data, db)
+
+
+@router.patch(
+    "/fcm-token",
+    summary="Update FCM device token",
+)
+async def update_fcm_token_endpoint(data: UpdateFCMTokenRequest, db: AsyncIOMotorDatabase = Depends(get_db),
+                                    user: dict = Depends(get_current_user)):
+    return await update_fcm_token(data.fcm_token, user, db)
+
+
+@router.patch(
+    "/notification-settings",
+    summary="Update notification settings",
+)
+async def update_notification_settings_endpoint(data: UpdateNotificationSettingsRequest,
+                                                db: AsyncIOMotorDatabase = Depends(get_db),
+                                                user: dict = Depends(get_current_user)):
+    return await update_notification_settings(data, user, db)
