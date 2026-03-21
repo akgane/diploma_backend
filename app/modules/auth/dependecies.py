@@ -6,12 +6,14 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import get_db
 from app.core.security import decode_access_token
 
+from loguru import logger
+
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
         credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-        db: AsyncIOMotorDatabase = Depends(get_db())
+        db: AsyncIOMotorDatabase = Depends(get_db)
 ) -> dict:
     """
     Dependency for secured endpoints
@@ -28,7 +30,7 @@ async def get_current_user(
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail="Invalid or expired token123",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

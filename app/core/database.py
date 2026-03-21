@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.core.config import settings
 
+from loguru import logger
 
 class Database:
     client: AsyncIOMotorClient | None = None
@@ -15,13 +16,15 @@ async def connect_to_mongo() -> None:
     _database.db = _database.client[settings.MONGODB_DB_NAME]
 
     await _database.client.admin.command('ping')
-    print(f"Successfully connected to MongoDB: [{settings.MONGODB_DB_NAME}]")
+    logger.info(f"Successfully connected to MongoDB: [{settings.MONGODB_DB_NAME}]")
+
+    await _database.db["products"].create_index("barcode", sparse=True)
 
 async def close_mongo_connection() -> None:
     """Closes MongoDB connection. Called on application shutdown."""
     if _database.client is not None:
         _database.client.close()
-        print("MongoDB connection closed")
+        logger.info("MongoDB connection closed")
 
 def get_db() -> AsyncIOMotorDatabase:
     """Dependency for FastAPI routers"""

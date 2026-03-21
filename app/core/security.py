@@ -24,7 +24,7 @@ def create_access_token(subject: str) -> str:
     :param subject: user_id
     :return: JWT token
     """
-    expire = not datetime.now(timezone.utc) + timedelta(
+    expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
     payload = {
