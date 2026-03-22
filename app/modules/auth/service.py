@@ -35,8 +35,10 @@ async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> User
 
     return UserResponse(
         id=str(result.inserted_id),
-        name=data.name,
-        email=data.email,
+        name=document["name"],
+        email=document["email"],
+        notification_days_before=document["notification_days_before"],
+        created_at=document["created_at"],
     )
 
 

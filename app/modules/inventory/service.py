@@ -26,6 +26,7 @@ def _format(doc: dict) -> InventoryItemResponse:
         unit=doc["unit"],
         expiration_date=doc["expiration_date"],
         status=doc["status"],
+        scheduled_notifications=doc.get("scheduled_notifications", []),
         added_at=doc["added_at"],
         updated_at=doc["updated_at"],
     )

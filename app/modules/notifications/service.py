@@ -39,7 +39,11 @@ async def send_expiration_notification(db: AsyncIOMotorDatabase) -> None:
         for idx, notification in enumerate(item.get("scheduled_notifications", [])):
             if notification["sent"]:
                 continue
-            if notification["send_at"] > now:
+
+            send_at = notification["send_at"]
+            if send_at.tzinfo is None:
+                send_at = send_at.replace(tzinfo=timezone.utc)
+            if send_at > now:
                 continue
 
             threshold = notification["threshold"]

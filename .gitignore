@@ -2,4 +2,5 @@
 /env.example
 /.idea
 /misc
+/food_tracker.egg-info
 firebase-credentials.json

@@ -70,7 +70,7 @@ class InventoryItemResponse(BaseModel):
     status: str
     added_at: datetime
     updated_at: datetime
-    scheduled_notifications: list[ScheduledNotification] = None
+    scheduled_notifications: list[ScheduledNotification] = []
 
 class InventoryStatsResponse(BaseModel):
     total_active: int
