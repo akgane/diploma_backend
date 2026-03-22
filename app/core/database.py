@@ -34,6 +34,8 @@ async def connect_to_mongo() -> None:
     await _database.db["ingredient_normalizations"].create_index("normalized")
     await _database.db["recipe_queries"].create_index("query", unique=True)
     await _database.db["recipe_queries"].create_index("ingredients")
+    await _database.db["shopping_list_items"].create_index([("user_id", 1), ("is_checked", 1)])
+
 
 async def close_mongo_connection() -> None:
     """Closes MongoDB connection. Called on application shutdown."""
