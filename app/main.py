@@ -8,11 +8,13 @@ from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection, get_db
 from app.core.firebase import init_firebase
 
-from app.modules.auth.router import router as auth_router
 from app.modules.notifications.scheduler import start_notification_scheduler
 from app.modules.notifications.service import send_expiration_notification
+
+from app.modules.auth.router import router as auth_router
 from app.modules.products.router import router as product_router
 from app.modules.inventory.router import router as inventory_router
+from app.modules.recipes.router import router as recipes_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +38,7 @@ app = FastAPI(
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(product_router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(inventory_router, prefix="/api/v1/inventory", tags=["Inventory"])
+app.include_router(recipes_router, prefix="/api/v1/recipes", tags=["Recipes"])
 
 
 @app.get("/health", tags=["System"])

@@ -4,7 +4,7 @@ API_URL = "https://world.openfoodfacts.net/api/v2"
 OFF_USER_AGENT="FoodTrackerDiploma/1.0"
 
 OFF_FETCH_COUNTRY = "kz"
-OFF_FETCH_LANGUAGE = "ru"
+OFF_FETCH_LANGUAGE = "en"
 
 def _clean_tags(raw_tags: list[str]) -> list[str]:
     """
