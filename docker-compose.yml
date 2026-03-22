@@ -13,9 +13,10 @@ services:
 
     environment:
       # ── App ───────────────────────────────────────────────────────────────
-      APP_ENV: development
-#      APP_HOST: 0.0.0.0
-#      APP_PORT: 8000
+      APP_TITLE: ${APP_TITLE}
+      APP_ENV: ${APP_ENV}
+      APP_HOST: ${APP_HOST}
+      APP_PORT: ${APP_PORT}
 
       # ── MongoDB Atlas ──────────────────────────────────────────────────────
       # Paste your Atlas connection string here or keep it in .env
@@ -23,12 +24,19 @@ services:
       MONGODB_DB_NAME: ${MONGODB_DB_NAME}
 
       # ── Auth / JWT ─────────────────────────────────────────────────────────
-#      SECRET_KEY: ${SECRET_KEY}
-#      ALGORITHM: HS256
-#      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
 
       # ── Firebase Cloud Messaging ───────────────────────────────────────────
-#      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH}
+
+      # ── GEMINI ───────────────────────────────────────────
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+
+      # ── SPOONACULAR ───────────────────────────────────────────
+      SPOONACULAR_API_KEY: ${SPOONACULAR_API_KEY}
+
 
     volumes:
       # Hot-reload: mount source so changes apply without rebuild
