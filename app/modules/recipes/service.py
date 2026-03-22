@@ -187,8 +187,8 @@ async def get_recipes_by_ingredients(
         return [_format(doc) for doc in db_results[:number]]
 
     # Step 4: Call Spoonacular
-    remaining = number - len(db_results)
-    fetch_count = max(remaining, number) * SPOONACULAR_FETCH_MULTIPLIER
+    # remaining = number - len(db_results)
+    fetch_count = number * SPOONACULAR_FETCH_MULTIPLIER
 
     logger.info(f"Calling Spoonacular for: {normalized_names}")
 

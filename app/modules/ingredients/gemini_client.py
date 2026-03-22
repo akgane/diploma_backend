@@ -50,6 +50,7 @@ async def normalize_ingredient(name: str, tags: list[str]) -> str | None:
 
         normalized = response.text.strip().lower()
         logger.info(f"Gemini normalized: '{name}' -> {normalized}")
+        return normalized
     except Exception as e:
         logger.error(f"Gemini normalization failed for '{name}': {e}")
         return None
