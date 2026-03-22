@@ -1,3 +1,5 @@
+import asyncio
+
 import firebase_admin
 from firebase_admin import credentials, messaging
 
@@ -23,7 +25,7 @@ async def send_push_notification(token: str, title: str, body: str) -> bool:
     )
 
     try:
-        messaging.send(message)
+        await asyncio.to_thread(messaging.send, message)
         logger.info(f"Notification sent to token: {token[:20]}...")
         return True
     except Exception as e:

@@ -42,7 +42,8 @@ app.include_router(inventory_router, prefix="/api/v1/inventory", tags=["Inventor
 async def health_check():
     return {"status": "ok", "version": "0.1.0"}
 
-@app.post("/debug/trigger-notifications", tags=["Debug"])
-async def trigger_notifications(db: AsyncIOMotorDatabase = Depends(get_db)):
-    await send_expiration_notification(db)
-    return {"detail": "done"}
+if settings.APP_ENV == "development":
+    @app.post("/debug/trigger-notifications", tags=["Debug"])
+    async def trigger_notifications(db: AsyncIOMotorDatabase = Depends(get_db)):
+        await send_expiration_notification(db)
+        return {"detail": "done"}

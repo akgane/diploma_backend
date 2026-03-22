@@ -1,7 +1,24 @@
 from datetime import datetime
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
+
+# region ENUMS
+
+class UnitEnum(StrEnum):
+    G = "g"
+    KG = "kg"
+    OZ = "oz"
+    LB = "lb"
+    ML = "ml"
+    L = "l"
+    FL_OZ = "fl_oz"
+    PCS = "pcs"
+    PACK = "pack"
+
+
+# endregion ENUMS
 
 # region REQUESTS
 
@@ -13,7 +30,7 @@ class AddInventoryItemRequest(BaseModel):
     notes: str | None = Field(None, example="For cereal", max_length=300)
     location: str | None = Field(None, example="Fridge", max_length=100)
     amount: float = Field(..., gt=0, example=1.0)
-    unit: str = Field(..., example="l")
+    unit: UnitEnum = Field(..., example="l")
     expiration_date: datetime = Field(..., example="2026-04-01T00:00:00")
 
 
@@ -23,7 +40,7 @@ class UpdateInventoryItemRequest(BaseModel):
     notes: str | None = Field(None, max_length=300)
     location: str | None = Field(None, max_length=100)
     amount: float | None = Field(None, gt=0)
-    unit: str | None = None
+    unit: UnitEnum | None = None
     expiration_date: datetime | None = None
 
 
@@ -54,5 +71,11 @@ class InventoryItemResponse(BaseModel):
     added_at: datetime
     updated_at: datetime
     scheduled_notifications: list[ScheduledNotification] = None
+
+class InventoryStatsResponse(BaseModel):
+    total_active: int
+    expiring_today: int
+    expiring_in_3_days: int
+    expired: int
 
 # endregion RESPONSES

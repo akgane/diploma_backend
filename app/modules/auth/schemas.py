@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, EmailStr
 
 
@@ -35,5 +37,8 @@ class UserResponse(BaseModel):
     id: str
     name: str
     email: str
+    fcm_token: str | None = None
+    notification_days_before: list[float]
+    created_at: datetime
 
 # endregion RESPONSES

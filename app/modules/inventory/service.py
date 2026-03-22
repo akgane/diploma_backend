@@ -5,7 +5,8 @@ from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.modules.inventory.models import build_inventory_document, build_scheduled_notifications
-from app.modules.inventory.schemas import InventoryItemResponse, AddInventoryItemRequest, UpdateInventoryItemRequest
+from app.modules.inventory.schemas import InventoryItemResponse, AddInventoryItemRequest, UpdateInventoryItemRequest, \
+    InventoryStatsResponse
 
 from loguru import logger
 
@@ -96,6 +97,42 @@ async def get_item(item_id: str, user: dict, db: AsyncIOMotorDatabase) -> Invent
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"Item with id {item_id} not found for user {user['_id']}")
     return _format(doc)
+
+
+async def get_stats(user: dict, db: AsyncIOMotorDatabase) -> InventoryStatsResponse:
+    """
+    Return inventory statistic for specific user
+    """
+
+    now = datetime.now(timezone.utc)
+    today_end = now.replace(hour=23, minute=59, second=59)
+    in_3_days = now + timedelta(days=3)
+
+    base = {"user_id": user["_id"], "status": "active"}
+
+    total_active = await db["inventory_items"].count_documents(base)
+
+    expiring_today = await db["inventory_items"].count_documents({
+        **base,
+        "expiration_date": {"$gte": now, "$lte": today_end},
+    })
+
+    expiring_in_3_days = await db["inventory_items"].count_documents({
+        **base,
+        "expiration_date": {"$gte": now, "$lte": in_3_days}
+    })
+
+    expired = await db["inventory_items"].count_documents({
+        **base,
+        "expiration_date": {"$lt": now}
+    })
+
+    return InventoryStatsResponse(
+        total_active=total_active,
+        expiring_today=expiring_today,
+        expiring_in_3_days=expiring_in_3_days,
+        expired=expired,
+    )
 
 
 async def update_item(item_id: str, data: UpdateInventoryItemRequest, user: dict,

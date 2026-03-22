@@ -2,8 +2,6 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
-from http.client import HTTPException
-
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.security import hash_password, verify_password, create_access_token
