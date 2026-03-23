@@ -33,11 +33,18 @@ async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> User
 
     result = await db["users"].insert_one(document)
 
+    login_request = LoginRequest(
+        email=data.email,
+        password=data.password
+    )
+    access_token = (await login_user(login_request, db)).access_token
+
     return UserResponse(
         id=str(result.inserted_id),
         name=document["name"],
         email=document["email"],
         notification_days_before=document["notification_days_before"],
+        access_token=access_token,
         created_at=document["created_at"],
     )
 
