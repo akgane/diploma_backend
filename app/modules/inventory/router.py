@@ -86,16 +86,6 @@ async def get_inventory_item(item_id: str, db: AsyncIOMotorDatabase = Depends(ge
 
 
 @router.patch(
-    "/{item_id}",
-    response_model=InventoryItemResponse,
-    summary="Update inventory item"
-)
-async def update_inventory_item(item_id: str, data: UpdateInventoryItemRequest,
-                                db: AsyncIOMotorDatabase = Depends(get_db), user: dict = Depends(get_current_user)):
-    return await update_item(item_id, data, user, db)
-
-
-@router.patch(
     "/{item_id}/consume",
     response_model=InventoryItemResponse,
     summary="Mark item as consumed",
@@ -106,6 +96,16 @@ async def consume_inventory_item(
         user: dict = Depends(get_current_user),
 ):
     return await consume_item(item_id, user, db)
+
+
+@router.patch(
+    "/{item_id}",
+    response_model=InventoryItemResponse,
+    summary="Update inventory item"
+)
+async def update_inventory_item(item_id: str, data: UpdateInventoryItemRequest,
+                                db: AsyncIOMotorDatabase = Depends(get_db), user: dict = Depends(get_current_user)):
+    return await update_item(item_id, data, user, db)
 
 
 @router.delete(
