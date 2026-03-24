@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field
 
+from app.modules.inventory.schemas import UnitEnum
+
 
 class ManualProductRequest(BaseModel):
     barcode: str | None = Field(None, example="4607034151760")

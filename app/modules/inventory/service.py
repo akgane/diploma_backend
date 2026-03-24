@@ -113,26 +113,36 @@ async def get_stats(user: dict, db: AsyncIOMotorDatabase) -> InventoryStatsRespo
 
     total_active = await db["inventory_items"].count_documents(base)
 
-    expiring_today = await db["inventory_items"].count_documents({
+
+    expiring_today_products_cursor = db["inventory_items"].find({
         **base,
         "expiration_date": {"$gte": now, "$lte": today_end},
     })
+    expiring_today_products = [_format(doc) for doc in await expiring_today_products_cursor.to_list()]
+    expiring_today = len(expiring_today_products)
 
-    expiring_in_3_days = await db["inventory_items"].count_documents({
+    expiring_in_3_days_products_cursor = db["inventory_items"].find({
         **base,
         "expiration_date": {"$gte": now, "$lte": in_3_days}
     })
+    expiring_in_3_days_products = [_format(doc) for doc in await expiring_in_3_days_products_cursor.to_list()]
+    expiring_in_3_days = len(expiring_in_3_days_products)
 
-    expired = await db["inventory_items"].count_documents({
+    expired_products_cursor = db["inventory_items"].find({
         **base,
         "expiration_date": {"$lt": now}
     })
+    expired_products = [_format(doc) for doc in await expired_products_cursor.to_list()]
+    expired = len(expired_products)
 
     return InventoryStatsResponse(
         total_active=total_active,
         expiring_today=expiring_today,
+        expiring_today_products=expiring_today_products,
         expiring_in_3_days=expiring_in_3_days,
+        expiring_in_3_days_products=expiring_in_3_days_products,
         expired=expired,
+        expired_products=expired_products,
     )
 
 

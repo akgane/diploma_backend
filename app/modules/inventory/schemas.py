@@ -72,10 +72,14 @@ class InventoryItemResponse(BaseModel):
     updated_at: datetime
     scheduled_notifications: list[ScheduledNotification] = []
 
+
 class InventoryStatsResponse(BaseModel):
     total_active: int
     expiring_today: int
+    expiring_today_products: list[InventoryItemResponse]
     expiring_in_3_days: int
+    expiring_in_3_days_products: list[InventoryItemResponse]
     expired: int
+    expired_products: list[InventoryItemResponse]
 
 # endregion RESPONSES
