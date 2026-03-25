@@ -39,7 +39,10 @@ class UserResponse(BaseModel):
     email: str
     fcm_token: str | None = None
     notification_days_before: list[float]
-    access_token: str
     created_at: datetime
+
+
+class RegisterResponse(UserResponse):
+    access_token: str
 
 # endregion RESPONSES

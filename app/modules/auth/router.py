@@ -3,9 +3,9 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from starlette import status
 
 from app.core.database import get_db
-from app.modules.auth.dependecies import get_current_user
+from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import UserResponse, RegisterRequest, TokenResponse, LoginRequest, UpdateFCMTokenRequest, \
-    UpdateNotificationSettingsRequest
+    UpdateNotificationSettingsRequest, RegisterResponse
 from app.modules.auth.service import register_user, login_user, update_fcm_token, update_notification_settings
 
 router = APIRouter()
@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.post(
     "/register",
-    response_model=UserResponse,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     summary="New user registration",
 )
@@ -58,7 +58,6 @@ async def get_me(user: dict = Depends(get_current_user)):
         id=str(user["_id"]),
         name=user["name"],
         email=user["email"],
-        fcm_token=user.get("fcm_token"),
         notification_days_before=user.get("notification_days_before", [3, 1, 0.5]),
         created_at=user["created_at"],
     )

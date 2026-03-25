@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.modules.inventory.schemas import UnitEnum
 
@@ -10,6 +10,13 @@ class ManualProductRequest(BaseModel):
     tags: list[str] = Field(default=[], example=["dairy", "milk"])
     image_url: str | None = None
     quantity: str | None = Field(None, example="1 l")
+
+    @field_validator("barcode")
+    @classmethod
+    def barcode_not_empty(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("Barcode cannot be empty or whitespace")
+        return v.strip() if v else v
 
 
 class ProductResponse(BaseModel):

@@ -4,3 +4,4 @@
 /misc
 /food_tracker.egg-info
 firebase-credentials.json
+**/__pycache__/

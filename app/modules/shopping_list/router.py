@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_db
-from app.modules.auth.dependecies import get_current_user
+from app.modules.auth.dependencies import get_current_user
 from app.modules.shopping_list.schemas import ShoppingListItemResponse, AddShoppingListItemRequest
 from app.modules.shopping_list.service import add_item, get_items, clear_checked, check_item, delete_item
 

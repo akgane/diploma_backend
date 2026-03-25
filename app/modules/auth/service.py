@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.security import hash_password, verify_password, create_access_token
 from app.modules.auth.models import build_user_document
 from app.modules.auth.schemas import RegisterRequest, UserResponse, TokenResponse, LoginRequest, \
-    UpdateNotificationSettingsRequest
+    UpdateNotificationSettingsRequest, RegisterResponse
 
 from loguru import logger
 
@@ -33,13 +33,9 @@ async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> User
 
     result = await db["users"].insert_one(document)
 
-    login_request = LoginRequest(
-        email=data.email,
-        password=data.password
-    )
-    access_token = (await login_user(login_request, db)).access_token
+    access_token = create_access_token(subject=str(result.inserted_id))
 
-    return UserResponse(
+    return RegisterResponse(
         id=str(result.inserted_id),
         name=document["name"],
         email=document["email"],

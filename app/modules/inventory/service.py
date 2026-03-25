@@ -113,7 +113,6 @@ async def get_stats(user: dict, db: AsyncIOMotorDatabase) -> InventoryStatsRespo
 
     total_active = await db["inventory_items"].count_documents(base)
 
-
     expiring_today_products_cursor = db["inventory_items"].find({
         **base,
         "expiration_date": {"$gte": now, "$lte": today_end},
@@ -202,7 +201,12 @@ async def delete_item(item_id: str, user: dict, db: AsyncIOMotorDatabase) -> dic
     """
     result = await db["inventory_items"].find_one_and_update(
         {"_id": ObjectId(item_id), "user_id": user["_id"]},
-        {"$set": {"status": "deleted", "updated_at": datetime.now(timezone.utc)}},
+        {"$set": {
+            "status": "deleted",
+            "updated_at": datetime.now(timezone.utc),
+            "scheduled_notifications.$[elem].sent": True
+        }},
+        array_filters=[{"elem.sent": False}]
     )
 
     if not result:

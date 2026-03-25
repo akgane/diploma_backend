@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     init_firebase()
 
     db = get_db()
-    asyncio.create_task(start_notification_scheduler(db))
+    asyncio.create_task(start_notification_scheduler())
 
     yield
 
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_TITLE,
     description="Cross-platform mobile app for automated food expiration tracking",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 

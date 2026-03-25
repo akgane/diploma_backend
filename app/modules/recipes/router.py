@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_db
-from app.modules.auth.dependecies import get_current_user
+from app.modules.auth.dependencies import get_current_user
 from app.modules.recipes.schemas import RecipeSearchRequest, RecipeResponse
 from app.modules.recipes.service import get_recipes_by_ingredients
 
