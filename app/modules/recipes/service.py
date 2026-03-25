@@ -1,14 +1,16 @@
 from itertools import combinations
 
+from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from loguru import logger
 
 from app.modules.ingredients.service import get_normalized
 from app.modules.recipes.models import build_recipe_document
 from app.modules.recipes.schemas import RecipeResponse
-from app.modules.recipes.spoonacular_client import find_recipes_by_ingredients
+from app.modules.recipes.spoonacular_client import find_recipes_by_ingredients, get_recipe_information
 
-SPOONACULAR_FETCH_MULTIPLIER = 2
+
+# SPOONACULAR_FETCH_MULTIPLIER = 2
 
 
 def _extract_all_ingredient_ids(recipe: dict) -> list[int]:
@@ -188,13 +190,13 @@ async def get_recipes_by_ingredients(
 
     # Step 4: Call Spoonacular
     # remaining = number - len(db_results)
-    fetch_count = number * SPOONACULAR_FETCH_MULTIPLIER
+    # fetch_count = number * SPOONACULAR_FETCH_MULTIPLIER
 
     logger.info(f"Calling Spoonacular for: {normalized_names}")
 
     spoonacular_results = await find_recipes_by_ingredients(
         ingredients=normalized_names,
-        number=fetch_count,
+        number=number,
     )
 
     if not spoonacular_results:
@@ -225,3 +227,85 @@ async def get_recipes_by_ingredients(
             seen_ids.add(doc["spoonacular_id"])
 
     return [_format(doc) for doc in db_results[:number]]
+
+
+def _parse_recipe_details(data: dict) -> dict:
+    """
+    Parses Spoonacular /information response into our storage format.
+    """
+    # Калории из nutrition
+    calories = None
+    nutrients = data.get("nutrition", {}).get("nutrients", [])
+    for nutrient in nutrients:
+        if nutrient.get("name") == "Calories":
+            calories = nutrient.get("amount")
+            break
+
+    # Ингредиенты с количеством
+    ingredients = []
+    for ing in data.get("extendedIngredients", []):
+        ingredients.append({
+            "id": ing.get("id"),
+            "name": ing.get("nameClean") or ing.get("name", ""),
+            "amount": ing.get("amount", 0),
+            "unit": ing.get("unit", ""),
+        })
+
+    # Шаги приготовления
+    steps = []
+    analyzed = data.get("analyzedInstructions", [])
+    if analyzed:
+        for step in analyzed[0].get("steps", []):
+            steps.append({
+                "number": step.get("number"),
+                "step": step.get("step", ""),
+            })
+
+    return {
+        "details_fetched": True,
+        "ready_in_minutes": data.get("readyInMinutes"),
+        "servings": data.get("servings"),
+        "calories": calories,
+        "ingredients": ingredients,
+        "steps": steps,
+    }
+
+
+async def get_recipe_details(
+        spoonacular_id: int,
+        db: AsyncIOMotorDatabase,
+) -> dict | None:
+    """
+    Returns full recipe details.
+    Fetches from Spoonacular if not yet cached, saves to DB.
+    """
+    doc = await db["recipes"].find_one({"spoonacular_id": spoonacular_id})
+
+    if not doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Recipe {spoonacular_id} not found",
+        )
+
+    if doc.get("details_fetched"):
+        logger.info(f"Recipe {spoonacular_id} details served from cache")
+        return doc
+
+    # Тянем с Spoonacular
+    data = await get_recipe_information(spoonacular_id)
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to fetch recipe details from Spoonacular",
+        )
+
+    details = _parse_recipe_details(data)
+
+    await db["recipes"].update_one(
+        {"spoonacular_id": spoonacular_id},
+        {"$set": details},
+    )
+
+    doc.update(details)
+    logger.info(f"Recipe {spoonacular_id} details cached")
+    return doc

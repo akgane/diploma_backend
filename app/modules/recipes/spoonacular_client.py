@@ -40,3 +40,26 @@ async def find_recipes_by_ingredients(
         except Exception as e:
             logger.error(f"Spoonacular request failed: {e}")
             return None
+
+
+async def get_recipe_information(recipe_id: int) -> dict | None:
+    """
+    Calls Spoonacular GET /recipes/{id}/information endpoint.
+    Returns full recipe details including ingredients, steps, nutrition.
+    """
+    url = f"{SPOONACULAR_API_URL}/recipes/{recipe_id}/information"
+    params = {
+        "apiKey": settings.SPOONACULAR_API_KEY,
+        "includeNutrition": True,
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"Spoonacular fetched details for recipe {recipe_id}")
+            return data
+        except Exception as e:
+            logger.error(f"Spoonacular get_recipe_information failed: {e}")
+            return None

@@ -19,5 +19,11 @@ def build_recipe_document(
         "title": title,
         "image": image,
         "ingredient_ids": ingredient_ids,
+        "details_fetched": False,
+        "ready_in_minutes": None,
+        "servings": None,
+        "calories": None,
+        "ingredients": [],
+        "steps": [],
         "created_at": datetime.now(timezone.utc),
     }
