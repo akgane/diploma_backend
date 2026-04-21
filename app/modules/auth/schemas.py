@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import BaseModel, Field, EmailStr
 
@@ -21,7 +22,11 @@ class UpdateFCMTokenRequest(BaseModel):
 
 
 class UpdateNotificationSettingsRequest(BaseModel):
-    notification_days_before: list[float] = Field(..., example=[3, 1, 0.5], min_length=1)
+    notification_days_before: list[Annotated[float, Field(ge=0)]] = Field(
+        ...,
+        examples=[[3, 1, 0.5]],
+        min_length=1
+    )
 
 
 # endregion REQUESTS

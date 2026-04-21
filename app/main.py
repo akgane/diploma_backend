@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     await connect_to_mongo()
     init_firebase()
 
-    db = get_db()
+    # db = get_db()
     asyncio.create_task(start_notification_scheduler())
 
     yield

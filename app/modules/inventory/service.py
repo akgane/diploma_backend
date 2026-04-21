@@ -81,7 +81,7 @@ async def get_items(user: dict, db: AsyncIOMotorDatabase, status_filter: str | N
         query["status"] = status_filter
 
     cursor = db["inventory_items"].find(query).sort("expiration_date", 1)
-    items = await cursor.to_list()
+    items = await cursor.to_list(length=10000)
 
     return [_format(doc) for doc in items]
 

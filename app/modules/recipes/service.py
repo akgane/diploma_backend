@@ -274,7 +274,7 @@ def _parse_recipe_details(data: dict) -> dict:
 async def get_recipe_details(
         spoonacular_id: int,
         db: AsyncIOMotorDatabase,
-) -> dict | None:
+) -> dict:
     """
     Returns full recipe details.
     Fetches from Spoonacular if not yet cached, saves to DB.

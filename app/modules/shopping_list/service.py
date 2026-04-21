@@ -49,7 +49,7 @@ async def get_items(
     cursor = db["shopping_list_items"].find(
         {"user_id": user["_id"]}
     ).sort("added_at", 1)
-    items = await cursor.to_list()
+    items = await cursor.to_list(length=10000)
     return [_format(doc) for doc in items]
 
 

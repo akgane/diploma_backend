@@ -15,7 +15,7 @@ router = APIRouter()
     summary="Search product by barcode (DB -> OpenFoodFacts)",
 )
 async def search_by_barcode(
-        barcode: str = Path(..., min_length=1, max_length=50, patter=r"^\S+$"),
+        barcode: str = Path(..., min_length=1, max_length=50, pattern=r"^\S+$"),
         db: AsyncIOMotorDatabase = Depends(get_db),
         _: dict = Depends(get_current_user)
 ):

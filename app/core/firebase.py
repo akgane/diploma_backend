@@ -8,10 +8,14 @@ from app.core.config import settings
 from loguru import logger
 
 def init_firebase() -> None:
-    if not firebase_admin._apps:
-        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-        firebase_admin.initialize_app(cred)
-        logger.info("Firebase initialized")
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        firebase_admin.initialize_app()
+    # if not firebase_admin._apps:
+    #     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+    #     firebase_admin.initialize_app(cred)
+    logger.info("Firebase initialized")
 
 async def send_push_notification(token: str, title: str, body: str) -> bool:
     """
