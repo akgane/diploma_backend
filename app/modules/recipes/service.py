@@ -1,4 +1,5 @@
-from itertools import combinations
+import random
+from datetime import date
 
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -9,12 +10,76 @@ from app.modules.recipes.models import build_recipe_document
 from app.modules.recipes.schemas import RecipeResponse
 from app.modules.recipes.spoonacular_client import find_recipes_by_ingredients, get_recipe_information
 
+# Maximum number of ingredients sent through the normalization + Spoonacular pipeline.
+# Prevents Gemini/Spoonacular quota exhaustion when the user has a large inventory.
+# Items are pre-sorted by expiration date (soonest first) in the router so the
+# most time-sensitive products are always included.
+MAX_INGREDIENTS = 15
 
-# SPOONACULAR_FETCH_MULTIPLIER = 2
+
+# scoring & sorting
+def _compute_match_score(user_normalized: set[str], recipe_ingredient_names: list[str]) -> float:
+    """
+    Computes what percentage of a recipe's ingredients the user already has.
+    Uses substring matching: "whole milk" is matched by user ingredient "milk".
+    Returns a value in [0.0, 100.0].
+    """
+    if not recipe_ingredient_names:
+        return 0.0
+
+    matched = 0
+    for recipe_ing in recipe_ingredient_names:
+        for user_ing in user_normalized:
+            if user_ing and (user_ing in recipe_ing or recipe_ing in user_ing):
+                matched += 1
+                break
+
+    return round((matched / len(recipe_ingredient_names)) * 100, 1)
 
 
+def _sort_with_daily_shuffle(docs: list[dict], user_normalized: set[str]) -> list[dict]:
+    """
+    1. Computes match_score for every recipe document (stored in "_score").
+    2. Sorts DESC by score.
+    3. Within groups sharing the same rounded score, applies a deterministic
+       daily shuffle so the user sees a fresh order each day without losing
+       relevance ordering between groups.
+    """
+    seed = date.today().toordinal()
+    rng = random.Random(seed)
+
+    for doc in docs:
+        doc["_score"] = _compute_match_score(user_normalized, doc.get("ingredient_names", []))
+
+    docs.sort(key=lambda d: d["_score"], reverse=True)
+
+    result: list[dict] = []
+    i = 0
+    while i < len(docs):
+        group_score = round(docs[i]["_score"])
+        j = i
+        while j < len(docs) and round(docs[j]["_score"]) == group_score:
+            j += 1
+        group = docs[i:j]
+        rng.shuffle(group)
+        result.extend(group)
+        i = j
+
+    return result
+
+
+# Formatting
+def _format(doc: dict) -> RecipeResponse:
+    return RecipeResponse(
+        spoonacular_id=doc["spoonacular_id"],
+        title=doc["title"],
+        image=doc.get("image"),
+        match_score=doc.get("_score", 0.0),
+    )
+
+
+# Internal DB / Spoonacular helpers
 def _extract_all_ingredient_ids(recipe: dict) -> list[int]:
-    """Extracts all ingredient ids from a Spoonacular recipe response."""
     ids = []
     for key in ("usedIngredients", "missedIngredients", "unusedIngredients"):
         for ingredient in recipe.get(key, []):
@@ -24,88 +89,57 @@ def _extract_all_ingredient_ids(recipe: dict) -> list[int]:
     return list(set(ids))
 
 
-def _format(doc: dict) -> RecipeResponse:
-    return RecipeResponse(
-        spoonacular_id=doc["spoonacular_id"],
-        title=doc["title"],
-        image=doc.get("image"),
-    )
+def _extract_ingredient_names(recipe: dict) -> list[str]:
+    """
+    Extracts lowercase ingredient names (used + missed) from a Spoonacular
+    findByIngredients response item, for match-score computation.
+    """
+    names: set[str] = set()
+    for key in ("usedIngredients", "missedIngredients"):
+        for ing in recipe.get(key, []):
+            name = (ing.get("name") or "").strip().lower()
+            if name:
+                names.add(name)
+    return list(names)
 
 
-async def _fetch_recipes_by_spoonacular_ids(
-        spoonacular_ids: list[int],
-        db: AsyncIOMotorDatabase,
-        number: int,
-) -> list[dict]:
-    """Fetches recipe documents from DB by their spoonacular_id."""
-    cursor = db["recipes"].find(
-        {"spoonacular_id": {"$in": spoonacular_ids}},
-    ).limit(number)
-    return await cursor.to_list(length=number)
-
-
-async def _search_db_with_combinations(
-        recipe_ids_per_ingredient: list[list[int]],
+async def _fetch_from_db_by_union(
+        normalized_names: list[str],
         db: AsyncIOMotorDatabase,
         number: int,
 ) -> list[dict]:
     """
-    Searches DB using progressively smaller subsets of ingredients.
+    Fetches cached recipes from DB using a simple union strategy:
 
-    recipe_ids_per_ingredient: for each ingredient, the list of spoonacular recipe ids
-    that were previously fetched when that ingredient was in the query.
+    1. Find all recipe_queries entries that contain ANY of the normalized names ($in).
+    2. Collect the union of all recipe_ids from those entries.
+    3. Fetch those recipe documents in a single query.
 
-    Tries combinations from largest to smallest:
-    1. All ingredients together (intersection — most relevant)
-    2. All pairs
-    3. All singles
-    Stops as soon as we reach `number` results.
-    Deduplicates by spoonacular_id.
+    This is exactly 2 MongoDB queries regardless of how many ingredients there
+    are, replacing the previous O(2^n) combinations approach.
     """
-    seen: set[int] = set()
-    results: list[dict] = []
-    n = len(recipe_ids_per_ingredient)
+    cursor = db["recipe_queries"].find({"ingredients": {"$in": normalized_names}})
+    query_entries = await cursor.to_list(length=1000)
 
-    for size in range(n, 0, -1):
-        if len(results) >= number:
-            break
+    all_recipe_ids: set[int] = set()
+    for entry in query_entries:
+        all_recipe_ids.update(entry.get("recipe_ids", []))
 
-        for combo_indices in combinations(range(n), size):
-            if len(results) >= number:
-                break
+    if not all_recipe_ids:
+        return []
 
-            # For this combination, take the INTERSECTION of recipe_id sets
-            # so we get recipes that appeared for ALL selected ingredients
-            sets = [set(recipe_ids_per_ingredient[i]) for i in combo_indices]
-            if size > 1:
-                candidate_ids = list(set.intersection(*sets))
-            else:
-                candidate_ids = list(sets[0])
+    # Fetch extra docs so the scorer has headroom to surface the best matches
+    cursor = db["recipes"].find({"spoonacular_id": {"$in": list(all_recipe_ids)}})
+    docs = await cursor.to_list(length=number * 5)
 
-            if not candidate_ids:
-                continue
-
-            docs = await _fetch_recipes_by_spoonacular_ids(candidate_ids, db, number)
-            for doc in docs:
-                sid = doc["spoonacular_id"]
-                if sid not in seen:
-                    results.append(doc)
-                    seen.add(sid)
-
-        logger.info(f"DB combinations [{size}/{n} ingredients]: {len(results)} results so far")
-
-    return results[:number]
+    logger.info(f"DB union fetch: {len(all_recipe_ids)} candidate ids → {len(docs)} docs")
+    return docs
 
 
 async def _save_recipes_from_spoonacular(
         spoonacular_results: list[dict],
         db: AsyncIOMotorDatabase,
 ) -> list[dict]:
-    """
-    Saves new recipes from Spoonacular to MongoDB.
-    Skips recipes that are already cached.
-    Returns all recipe documents (new + existing).
-    """
     result_docs = []
 
     for recipe in spoonacular_results:
@@ -117,11 +151,14 @@ async def _save_recipes_from_spoonacular(
             continue
 
         ingredient_ids = _extract_all_ingredient_ids(recipe)
+        ingredient_names = _extract_ingredient_names(recipe)
+
         document = build_recipe_document(
             spoonacular_id=spoonacular_id,
             title=recipe["title"],
             image=recipe.get("image"),
             ingredient_ids=ingredient_ids,
+            ingredient_names=ingredient_names,
         )
         await db["recipes"].insert_one(document)
         result_docs.append(document)
@@ -130,70 +167,56 @@ async def _save_recipes_from_spoonacular(
     return result_docs
 
 
+# Public API
 async def get_recipes_by_ingredients(
         raw_ingredients: list[str],
-        tags_map: dict[str, list[str]],
         db: AsyncIOMotorDatabase,
         strategy: str = "soft",
         number: int = 10,
 ) -> list[RecipeResponse]:
     """
-    Main entry point for recipe search.
+    Main entry point for recipe recommendations.
 
     Flow:
-    1. Normalize each ingredient name via cache → Gemini
-    2. For each normalized name find all recipe_ids previously fetched
-       for queries containing that ingredient (from recipe_queries collection)
-    3. Search DB using combinations of those recipe_id sets (intersection-first)
-    4. If not enough → call Spoonacular → cache recipes → store query mapping → merge
-
-    recipe_queries collection schema:
-      { query: "eggs,pasta", ingredients: ["eggs", "pasta"], recipe_ids: [649293, ...] }
+    1. Cap ingredients at MAX_INGREDIENTS (already sorted by expiry in router)
+    2. Normalize each name: DB cache → Gemini; on Gemini failure use raw fallback
+    3. Search DB cache via union of all matching recipe_ids (2 queries total)
+    4. If not enough → call Spoonacular → cache → update query mapping → merge
+    5. Compute match score for every recipe vs user's normalized ingredients
+    6. Sort DESC by score; within same-score groups apply daily deterministic shuffle
     """
 
-    # Step 1: Normalize ingredient names
-    normalized_names = []
+    # Step 1: Cap
+    raw_ingredients = raw_ingredients[:MAX_INGREDIENTS]
+
+    # Step 2: Normalize — fallback to raw lowercase when Gemini is unavailable
+    normalized_names: list[str] = []
     for raw in raw_ingredients:
-        tags = tags_map.get(raw, [])
-        normalized = await get_normalized(raw, tags, db)
+        normalized = await get_normalized(raw, [], db)
         if normalized:
             normalized_names.append(normalized)
+        else:
+            fallback = raw.strip().lower()
+            if fallback:
+                normalized_names.append(fallback)
+                logger.info(f"Gemini unavailable for '{raw}', using raw fallback: '{fallback}'")
 
     if not normalized_names:
         logger.warning("No ingredients could be normalized")
         return []
 
-    # Step 2: For each ingredient, collect all recipe_ids from previous queries
-    recipe_ids_per_ingredient: list[list[int]] = []
+    user_normalized: set[str] = set(normalized_names)
 
-    for name in normalized_names:
-        cursor = db["recipe_queries"].find({"ingredients": name})
-        entries = await cursor.to_list(length=100)
-        ids: list[int] = []
-        for entry in entries:
-            ids.extend(entry.get("recipe_ids", []))
-        recipe_ids_per_ingredient.append(list(set(ids)))
-
-    # Step 3: Search DB using combinations
-    db_results = []
-    has_any_ids = any(ids for ids in recipe_ids_per_ingredient)
-
-    if has_any_ids:
-        db_results = await _search_db_with_combinations(
-            recipe_ids_per_ingredient, db, number=number
-        )
-        logger.info(f"DB cache returned {len(db_results)} recipes")
+    # Step 3: DB cache — union approach, no combinatorial explosion
+    db_results = await _fetch_from_db_by_union(normalized_names, db, number)
 
     if len(db_results) >= number:
         logger.info("Serving fully from DB cache")
-        return [_format(doc) for doc in db_results[:number]]
+        sorted_docs = _sort_with_daily_shuffle(db_results, user_normalized)
+        return [_format(doc) for doc in sorted_docs[:number]]
 
-    # Step 4: Call Spoonacular
-    # remaining = number - len(db_results)
-    # fetch_count = number * SPOONACULAR_FETCH_MULTIPLIER
-
+    # Step 4: Spoonacular
     logger.info(f"Calling Spoonacular for: {normalized_names}")
-
     spoonacular_results = await find_recipes_by_ingredients(
         ingredients=normalized_names,
         number=number,
@@ -201,9 +224,9 @@ async def get_recipes_by_ingredients(
 
     if not spoonacular_results:
         logger.warning("Spoonacular returned no results")
-        return [_format(doc) for doc in db_results]
+        sorted_docs = _sort_with_daily_shuffle(db_results, user_normalized)
+        return [_format(doc) for doc in sorted_docs]
 
-    # Step 5: Save recipes and store query → recipe_ids mapping
     new_docs = await _save_recipes_from_spoonacular(spoonacular_results, db)
     new_recipe_ids = [doc["spoonacular_id"] for doc in new_docs]
 
@@ -219,47 +242,39 @@ async def get_recipes_by_ingredients(
     )
     logger.info(f"Query cached: '{query_key}' → {len(new_recipe_ids)} recipes")
 
-    # Merge and deduplicate
     seen_ids = {doc["spoonacular_id"] for doc in db_results}
     for doc in new_docs:
         if doc["spoonacular_id"] not in seen_ids:
             db_results.append(doc)
             seen_ids.add(doc["spoonacular_id"])
 
-    return [_format(doc) for doc in db_results[:number]]
+    sorted_docs = _sort_with_daily_shuffle(db_results, user_normalized)
+    return [_format(doc) for doc in sorted_docs[:number]]
 
 
+# Recipe detail
 def _parse_recipe_details(data: dict) -> dict:
-    """
-    Parses Spoonacular /information response into our storage format.
-    """
-    # Калории из nutrition
     calories = None
-    nutrients = data.get("nutrition", {}).get("nutrients", [])
-    for nutrient in nutrients:
+    for nutrient in data.get("nutrition", {}).get("nutrients", []):
         if nutrient.get("name") == "Calories":
             calories = nutrient.get("amount")
             break
 
-    # Ингредиенты с количеством
-    ingredients = []
-    for ing in data.get("extendedIngredients", []):
-        ingredients.append({
+    ingredients = [
+        {
             "id": ing.get("id"),
             "name": ing.get("nameClean") or ing.get("name", ""),
             "amount": ing.get("amount", 0),
             "unit": ing.get("unit", ""),
-        })
+        }
+        for ing in data.get("extendedIngredients", [])
+    ]
 
-    # Шаги приготовления
     steps = []
     analyzed = data.get("analyzedInstructions", [])
     if analyzed:
         for step in analyzed[0].get("steps", []):
-            steps.append({
-                "number": step.get("number"),
-                "step": step.get("step", ""),
-            })
+            steps.append({"number": step.get("number"), "step": step.get("step", "")})
 
     return {
         "details_fetched": True,
@@ -271,14 +286,7 @@ def _parse_recipe_details(data: dict) -> dict:
     }
 
 
-async def get_recipe_details(
-        spoonacular_id: int,
-        db: AsyncIOMotorDatabase,
-) -> dict:
-    """
-    Returns full recipe details.
-    Fetches from Spoonacular if not yet cached, saves to DB.
-    """
+async def get_recipe_details(spoonacular_id: int, db: AsyncIOMotorDatabase) -> dict:
     doc = await db["recipes"].find_one({"spoonacular_id": spoonacular_id})
 
     if not doc:
@@ -291,7 +299,6 @@ async def get_recipe_details(
         logger.info(f"Recipe {spoonacular_id} details served from cache")
         return doc
 
-    # Тянем с Spoonacular
     data = await get_recipe_information(spoonacular_id)
     if not data:
         raise HTTPException(
@@ -300,7 +307,6 @@ async def get_recipe_details(
         )
 
     details = _parse_recipe_details(data)
-
     await db["recipes"].update_one(
         {"spoonacular_id": spoonacular_id},
         {"$set": details},
