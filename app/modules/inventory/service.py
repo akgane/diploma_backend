@@ -230,6 +230,6 @@ async def get_expiring_items(user: dict, db: AsyncIOMotorDatabase, days: int = 3
         "expiration_date": {"$gte": now, "$lte": threshold},
     }).sort("expiration_date", 1)
 
-    items = await cursor.to_list()
+    items = await cursor.to_list(length=10000)
 
     return [_format(doc) for doc in items]

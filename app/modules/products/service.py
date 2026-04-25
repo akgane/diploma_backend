@@ -43,7 +43,15 @@ async def get_or_fetch(barcode: str, db: AsyncIOMotorDatabase) -> ProductRespons
         off_data = format_fields(off_data)
 
         # building document
-        document = build_product_document(**off_data)
+        document = build_product_document(
+            name=off_data.get("name", "unknown"),
+            source=off_data.get("source", "unknown"),
+            barcode=off_data.get("barcode", ""),
+            brand=off_data.get("brand", ""),
+            tags=off_data.get("tags", []),
+            image_url=off_data.get("image_url", None),
+            quantity=off_data.get("quantity", ""),
+        )
 
         # inserting to db
         result = await db["products"].insert_one(document)

@@ -58,6 +58,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         id=str(user["_id"]),
         name=user["name"],
         email=user["email"],
+        fcm_token=user["fcm_token"],
         notification_days_before=user.get("notification_days_before", [3, 1, 0.5]),
         created_at=user["created_at"],
     )
