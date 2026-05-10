@@ -1,20 +1,34 @@
 import asyncio
+from pathlib import Path
 
 import firebase_admin
 from firebase_admin import credentials, messaging
 
-from app.core.config import settings
 
 from loguru import logger
 
+from app.core.config import settings
+
+
 def init_firebase() -> None:
+    # import os
+    # print("PATH:", settings.FIREBASE_CREDENTIALS_PATH)
+    # print("EXISTS:", os.path.exists(settings.FIREBASE_CREDENTIALS_PATH))
+
     try:
         firebase_admin.get_app()
+        logger.info('Firebase already initialized')
     except ValueError:
-        firebase_admin.initialize_app()
-    # if not firebase_admin._apps:
-    #     cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-    #     firebase_admin.initialize_app(cred)
+        pass
+
+    cred_path = Path(settings.FIREBASE_CREDENTIALS_PATH).resolve()
+
+    logger.info(f"Using Firebase credentials: {cred_path}")
+
+    cred = credentials.Certificate(str(cred_path))
+
+    firebase_admin.initialize_app(cred)
+
     logger.info("Firebase initialized")
 
 async def send_push_notification(token: str, title: str, body: str) -> bool:

@@ -1,7 +1,5 @@
 import asyncio
 
-from motor.motor_asyncio import AsyncIOMotorDatabase
-
 from loguru import logger
 
 from app.core.database import get_db

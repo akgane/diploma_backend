@@ -37,6 +37,7 @@ async def get_or_fetch(barcode: str, db: AsyncIOMotorDatabase) -> ProductRespons
         logger.info(f"Product found in DB: {barcode}")
         return _format(existing)
 
+    # Fetch OFF and save to cache
     off_data = await fetch_product_by_barcode(barcode)
     if off_data and off_data.get("name"):
         # formatting fields before paste to db

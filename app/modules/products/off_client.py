@@ -34,7 +34,6 @@ async def fetch_product_by_barcode(barcode: str) -> dict | None:
         return None
 
     product = data.get("product", {})
-
     return {
         "barcode": barcode,
         "name": product.get("product_name") or None,

@@ -3,6 +3,6 @@
 /.idea
 /misc
 /food_tracker.egg-info
-firebase-credentials.json
 **/__pycache__/
 /.claude
+firebase-credentials.json
