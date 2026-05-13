@@ -1,11 +1,61 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
-from mongomock_motor import AsyncMongoMockClient
+from mongomock_motor import AsyncMongoMockClient, AsyncMongoMockCollection
 from unittest.mock import patch, AsyncMock
 
 from app.main import app
 from app.core.database import _database
+
+
+_original_find_one_and_update = AsyncMongoMockCollection.find_one_and_update
+
+
+async def _find_one_and_update_with_array_filters(self, filter, update, *args, **kwargs):
+    """
+    mongomock does not support MongoDB array_filters, but the app uses one
+    during inventory soft-delete to mark pending notifications as sent.
+    Emulate that narrow behavior so integration tests keep using the real
+    route/service code while staying on in-memory Mongo.
+    """
+    array_filters = kwargs.get("array_filters")
+    set_update = update.get("$set", {}) if isinstance(update, dict) else {}
+
+    if (
+        array_filters == [{"elem.sent": False}]
+        and "scheduled_notifications.$[elem].sent" in set_update
+    ):
+        kwargs = dict(kwargs)
+        kwargs.pop("array_filters", None)
+
+        compatible_set = dict(set_update)
+        notification_sent = compatible_set.pop("scheduled_notifications.$[elem].sent")
+        compatible_update = dict(update)
+        if compatible_set:
+            compatible_update["$set"] = compatible_set
+            result = await _original_find_one_and_update(self, filter, compatible_update, *args, **kwargs)
+        else:
+            result = await self.find_one(filter)
+
+        if not result:
+            return result
+
+        current = await self.find_one({"_id": result["_id"]})
+        notifications = current.get("scheduled_notifications", [])
+        for notification in notifications:
+            if notification.get("sent") is False:
+                notification["sent"] = notification_sent
+
+        await self.update_one(
+            {"_id": result["_id"]},
+            {"$set": {"scheduled_notifications": notifications}},
+        )
+        return result
+
+    return await _original_find_one_and_update(self, filter, update, *args, **kwargs)
+
+
+AsyncMongoMockCollection.find_one_and_update = _find_one_and_update_with_array_filters
 
 
 @pytest.fixture(scope="session")
