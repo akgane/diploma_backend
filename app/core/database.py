@@ -32,6 +32,8 @@ async def connect_to_mongo() -> None:
     await _database.db["recipes"].create_index("spoonacular_id", unique=True)
     await _database.db["ingredient_normalizations"].create_index("raw", unique=True)
     await _database.db["ingredient_normalizations"].create_index("normalized")
+    await _database.db["storage_recommendations"].create_index("canonical_name", unique=True)
+    await _database.db["storage_recommendations"].create_index("normalized_aliases")
     await _database.db["recipe_queries"].create_index("query", unique=True)
     await _database.db["recipe_queries"].create_index("ingredients")
     await _database.db["shopping_list_items"].create_index([("user_id", 1), ("is_checked", 1)])
