@@ -16,6 +16,7 @@ class TestBuildUserDocument:
     def test_defaults(self):
         doc = build_user_document("John", "john@example.com", "hashed_pw")
         assert doc["is_active"] is True
+        assert doc["account_type"] == "personal"
         assert doc["fcm_token"] is None
         assert doc["notification_days_before"] == [3, 1, 0.5]
 

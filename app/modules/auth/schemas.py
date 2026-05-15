@@ -1,7 +1,9 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, EmailStr
+
+AccountType = Literal["personal", "business"]
 
 
 # region REQUESTS
@@ -29,6 +31,10 @@ class UpdateNotificationSettingsRequest(BaseModel):
     )
 
 
+class UpdateAccountTypeRequest(BaseModel):
+    account_type: AccountType = Field(..., examples=["personal, business"])
+
+
 # endregion REQUESTS
 
 # region RESPONSES
@@ -42,6 +48,7 @@ class UserResponse(BaseModel):
     id: str
     name: str
     email: str
+    account_type: AccountType
     fcm_token: str | None = None
     notification_days_before: list[float]
     created_at: datetime

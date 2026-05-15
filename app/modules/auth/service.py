@@ -7,7 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.security import hash_password, verify_password, create_access_token
 from app.modules.auth.models import build_user_document
 from app.modules.auth.schemas import RegisterRequest, UserResponse, TokenResponse, LoginRequest, \
-    UpdateNotificationSettingsRequest, RegisterResponse
+    UpdateNotificationSettingsRequest, RegisterResponse, UpdateAccountTypeRequest
 
 from loguru import logger
 
@@ -39,6 +39,7 @@ async def register_user(data: RegisterRequest, db: AsyncIOMotorDatabase) -> User
         id=str(result.inserted_id),
         name=document["name"],
         email=document["email"],
+        account_type=document["account_type"],
         notification_days_before=document["notification_days_before"],
         access_token=access_token,
         created_at=document["created_at"],
@@ -80,5 +81,17 @@ async def update_notification_settings(data: UpdateNotificationSettingsRequest, 
             "updated_at": datetime.now(timezone.utc),
         }}
     )
-    logger.info(f"Notification settings updated for user {user["_id"]}")
+    logger.info(f"Notification settings updated for user {user['_id']}")
     return {"detail": "Notification settings updated"}
+
+
+async def update_account_type(data: UpdateAccountTypeRequest, user: dict, db: AsyncIOMotorDatabase) -> dict:
+    await db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {
+            "account_type": data.account_type,
+            "updated_at": datetime.now(timezone.utc),
+        }}
+    )
+    logger.info(f"Account type updated for user {user['_id']}")
+    return {"detail": "Account type updated"}

@@ -5,8 +5,9 @@ from starlette import status
 from app.core.database import get_db
 from app.modules.auth.dependencies import get_current_user
 from app.modules.auth.schemas import UserResponse, RegisterRequest, TokenResponse, LoginRequest, UpdateFCMTokenRequest, \
-    UpdateNotificationSettingsRequest, RegisterResponse
-from app.modules.auth.service import register_user, login_user, update_fcm_token, update_notification_settings
+    UpdateNotificationSettingsRequest, RegisterResponse, UpdateAccountTypeRequest
+from app.modules.auth.service import register_user, login_user, update_fcm_token, update_notification_settings, \
+    update_account_type
 
 router = APIRouter()
 
@@ -48,6 +49,17 @@ async def update_notification_settings_endpoint(data: UpdateNotificationSettings
                                                 user: dict = Depends(get_current_user)):
     return await update_notification_settings(data, user, db)
 
+
+@router.patch(
+    "/account-type",
+    summary="Update account type",
+)
+async def update_account_type_endpoint(data: UpdateAccountTypeRequest,
+                                       db: AsyncIOMotorDatabase = Depends(get_db),
+                                       user: dict = Depends(get_current_user)):
+    return await update_account_type(data, user, db)
+
+
 @router.get(
     "/me",
     response_model=UserResponse,
@@ -58,6 +70,7 @@ async def get_me(user: dict = Depends(get_current_user)):
         id=str(user["_id"]),
         name=user["name"],
         email=user["email"],
+        account_type=user.get("account_type", "personal"),
         fcm_token=user["fcm_token"],
         notification_days_before=user.get("notification_days_before", [3, 1, 0.5]),
         created_at=user["created_at"],

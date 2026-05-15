@@ -6,6 +6,7 @@ LOGIN_URL = "/api/v1/auth/login"
 ME_URL = "/api/v1/auth/me"
 FCM_URL = "/api/v1/auth/fcm-token"
 NOTIFICATION_SETTINGS_URL = "/api/v1/auth/notification-settings"
+ACCOUNT_TYPE_URL = "/api/v1/auth/account-type"
 
 VALID_USER = {
     "name": "John Doe",
@@ -42,6 +43,7 @@ class TestRegister:
         data = response.json()
         assert data["name"] == VALID_USER["name"]
         assert data["email"] == VALID_USER["email"]
+        assert data["account_type"] == "personal"
         assert "id" in data
         assert "password" not in data
 
@@ -98,6 +100,7 @@ class TestGetMe:
         data = response.json()
         assert data["email"] == VALID_USER["email"]
         assert data["name"] == VALID_USER["name"]
+        assert data["account_type"] == "personal"
         assert "notification_days_before" in data
         assert "created_at" in data
         assert "password" not in data
@@ -165,5 +168,42 @@ class TestUpdateNotificationSettings:
         response = await client.patch(
             NOTIFICATION_SETTINGS_URL,
             json={"notification_days_before": [3, 1]},
+        )
+        assert response.status_code == 401
+
+
+class TestUpdateAccountType:
+    async def test_success(self, client: AsyncClient):
+        headers = await get_auth_headers(client)
+        response = await client.patch(
+            ACCOUNT_TYPE_URL,
+            json={"account_type": "business"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+
+    async def test_reflected_in_me(self, client: AsyncClient):
+        headers = await get_auth_headers(client)
+        await client.patch(
+            ACCOUNT_TYPE_URL,
+            json={"account_type": "business"},
+            headers=headers,
+        )
+        response = await client.get(ME_URL, headers=headers)
+        assert response.json()["account_type"] == "business"
+
+    async def test_invalid_account_type_rejected(self, client: AsyncClient):
+        headers = await get_auth_headers(client)
+        response = await client.patch(
+            ACCOUNT_TYPE_URL,
+            json={"account_type": "enterprise"},
+            headers=headers,
+        )
+        assert response.status_code == 422
+
+    async def test_unauthorized(self, client: AsyncClient):
+        response = await client.patch(
+            ACCOUNT_TYPE_URL,
+            json={"account_type": "personal"},
         )
         assert response.status_code == 401
